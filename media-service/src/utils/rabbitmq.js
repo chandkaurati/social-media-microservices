@@ -20,7 +20,23 @@ export async function connectToRabbitMq() {
   }
 }
 
-export async function Publishevent(routingKey, message) {}
+export async function Publishevent(routingKey, message) {
+
+  if (!channel) channel = await connectToRabbitMq();
+  try {
+    channel.publish(
+      EXCHANGE_NAME,
+      routingKey,
+      Buffer.from(JSON.stringify(message))
+    );
+    logger.info("event published", `${routingKey}, ${message}`);
+  } catch (error) {
+    console.log(error);
+    throw error;
+  }
+
+
+}
 
 export async function ConsumeEvent(routingKey, callback) {
   try {
