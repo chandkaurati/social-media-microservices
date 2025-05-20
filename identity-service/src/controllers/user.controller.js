@@ -1,143 +1,109 @@
 import Student from "../models/user.model.js";
 import logger from "../utils/logger.js";
-import { validateLogin, validateRegistration } from "../utils/validation.js"
+import { validateLogin, validateRegistration } from "../utils/validation.js";
 import genrateTokens from "../utils/genrateTokens.js";
+import ApiError from "../utils/apiError.js";
+import STATUS_CODES from "../utils/statusCodes.js";
+import ApiResponce from "../utils/apiResponce.js";
+import asyncHandler from "../utils/asyncHandler.js";
 
-export const registerUser = async (req, res) => {
+export const registerUser = asyncHandler(async (req, res, next) => {
   logger.info("Registration Endpoint hitted...");
-  try {
-    const errors = validateRegistration(req.body);
-    console.log(typeof errors.details);
-    if (errors?.error) {
-      logger.warn("Validation Error", errors?.details[0].message);
-      return res.status(400).json({
-        success: false,
-        message: errors.error?.details[0].message || "All feilds are required",
-        errors: errors.error,
-      });
-    }
 
-    const { username, email, password } = req.body;
+  const errors = validateRegistration(req.body);
 
-    const user = await Student.findOne({ $or: [{ email }, { username }] });
-    if (user) {
-      logger.warn("user already exists with this email or username");
-      return res.status(400).json({
-        success: false,
-        message: "user is already exists with this email or username",
-      });
-    }
-
-    const newUser = await Student.create({
-      username,
-      email,
-      password,
-    });
-
-    const { refreshToken, accessToken } = await genrateTokens(newUser);
-
-    const userObject = newUser.toObject();
-
-    delete userObject.password;
-
-    res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "user created successFully",
-      data: userObject,
-      refreshtoken: refreshToken,
-      accesstoken: accessToken,
-    });
-  } catch (error) {
-    logger.error("Registration error occured", error);
-    res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Internal Server Error",
-    });
+  if (errors) {
+    logger.warn("Validation Error", errors.error?.details[0].message);
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      errors.error?.details[0].message,
+      errors.error
+    );
   }
-};
 
-export const loginUser = async (req, res) => {
-  logger.warn("Login route hitted");
-  try {
-    // const errors = validateLogin(req.body);
-    // console.log(errors);
-    // console.log(typeof errors.details);
-    // if (errors) {
-    //   logger.warn("Validation Error", errors.error?.details[0].message);
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: errors.error?.details[0].message || "All feilds are required",
-    //     errors: errors.error,
-    //   });
-    // }
-    
-    
-    const { email, password } = req.body;
+  const { username, email, password } = req.body;
+  const user = await Student.findOne({ $or: [{ email }, { username }] });
+  if (user) {
+    logger.warn("user already exists with this email or username");
+    throw new ApiError(
+      STATUS_CODES.CONFLICT,
+      "user already exists with this email or username"
+    );
+  }
 
-    const student = await Student.findOne({ email });
+  const newUser = await Student.create({
+    username,
+    email,
+    password,
+  });
 
-    if (!student) {
-      logger.warn("invalid user");
-      return res.status(400).json({
-        success: false,
-        message: "user not found with this email",
-      });
-    }
+  const { refreshToken, accessToken } = await genrateTokens(newUser);
 
-    const isPasswordCorrect = await student.comparePassword(password);
-    console.log(isPasswordCorrect);
-    if (!isPasswordCorrect) {
-      logger.warn("incorrect password");
-      return res.status(400).json({
-        success: false,
-        message: "incorrect password",
-      });
-    }
+  const userObject = newUser.toObject();
 
-    const { refreshToken, accessToken } = await genrateTokens(student);
+  delete userObject.password;
 
-    res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-    });
+  res.cookie("accessToken", accessToken, {
+    httpOnly: true,
+  });
 
-    const studentObj = student.toObject();
-
-    delete studentObj.password;
-
-    return res.status(200).json({
-      success: true,
-      message: "logged in successFully",
-      data: studentObj,
+  return res.status(STATUS_CODES.CREATED).json(
+    new ApiResponce(STATUS_CODES.CREATED, "User Registered successFully", {
+      ...userObject,
       accessToken,
       refreshToken,
-    });
-  } catch (error) {
-    logger.error("login error occured", error);
-    res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Internal Server Error",
-    });
-  }
-};
+    })
+  );
+});
 
-export const getInfo = async (req, res) => {
-  return res.status(201).json({
-    success: true,
-    data: [
-      {
-        name: "chand",
-        email: "Chand@gmail.com",
-        location: "India",
-      },
-      {
-        name: "user1",
-        email: "user1@gmail.com",
-        location: "us",
-      },
-    ],
+export const loginUser = asyncHandler(async (req, res) => {
+  logger.warn("Login route hitted");
+  const errors = validateLogin(req.body);
+
+  console.log(errors);
+
+  if (errors?.error) {
+    logger.warn("Validation Error", errors.error?.details[0].message);
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      errors.error?.details[0].message,
+      errors.error
+    );
+  }
+
+  const { email, password } = req.body;
+
+  const student = await Student.findOne({ email });
+
+  if (!student) {
+    logger.warn("invalid user");
+    throw new ApiError(STATUS_CODES.UNAUTHORIZED, "invalid user");
+  }
+
+  const isPasswordCorrect = await student.comparePassword(password);
+
+  if (!isPasswordCorrect) {
+    logger.warn("incorrect password");
+    throw new ApiError(STATUS_CODES.UNAUTHORIZED, "incorrect password");
+  }
+
+  const { refreshToken, accessToken } = await genrateTokens(student);
+
+  res.cookie("accessToken", accessToken, {
+    httpOnly: true,
   });
-};
+
+  const studentObj = student.toObject();
+
+  delete studentObj.password;
+
+  return res.status(STATUS_CODES.OK).json(
+    new ApiResponce(STATUS_CODES.OK, "Login successFully", {
+      ...studentObj,
+      accessToken,
+      refreshToken,
+    })
+  );
+});
+
+export const logoutUser = async (req, res) => {};

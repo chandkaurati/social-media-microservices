@@ -9,6 +9,7 @@ import { rateLimit } from "express-rate-limit";
 import { RedisStore } from "rate-limit-redis";
 import errorHandler from "./middlewares/errorHandler.js";
 import cookieParser from "cookie-parser";
+import ApiError from "./utils/apiError.js";
 const app = express();
 
 export const redisClient = new Redis({
@@ -77,14 +78,17 @@ app.use("/api/auth/register", reateLimiterForIndivisualRoutes);
 
 app.use("/api/auth", userRouter);
 
-// error handler
+// error handling
+
+app.use((req, res, next) => {
+  next(new ApiError(404, "Route not found"));
+});
 
 app.use(errorHandler);
 
-// unhandled promise rejection
-
 process.on("unhandledRejection", (reason, promise) => {
   logger.error("UnhandledRejection at ", promise, reason);
+  process.exit(1);
 });
 
 export default app;

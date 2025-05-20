@@ -15,7 +15,7 @@ export const validateRegistration = (data)=>{
 export const validateLogin = (data)=>{
     const schema =  joi.object({
      email :  joi.string().email().required(),
-     password: joi.string().min(6).max(20).required()
+     password: joi.required()
     })
     return schema.validate(data)
 }
