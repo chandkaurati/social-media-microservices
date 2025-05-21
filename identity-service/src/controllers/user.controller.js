@@ -1,4 +1,4 @@
-import Student from "../models/user.model.js";
+import User from "../models/user.model.js";
 import logger from "../utils/logger.js";
 import { validateLogin, validateRegistration } from "../utils/validation.js";
 import genrateTokens from "../utils/genrateTokens.js";
@@ -6,13 +6,14 @@ import ApiError from "../utils/apiError.js";
 import STATUS_CODES from "../utils/statusCodes.js";
 import ApiResponce from "../utils/apiResponce.js";
 import asyncHandler from "../utils/asyncHandler.js";
+import argon2 from "argon2";
 
 export const registerUser = asyncHandler(async (req, res, next) => {
   logger.info("Registration Endpoint hitted...");
 
   const errors = validateRegistration(req.body);
 
-  if (errors) {
+  if (errors?.error) {
     logger.warn("Validation Error", errors.error?.details[0].message);
     throw new ApiError(
       STATUS_CODES.BAD_REQUEST,
@@ -22,7 +23,7 @@ export const registerUser = asyncHandler(async (req, res, next) => {
   }
 
   const { username, email, password } = req.body;
-  const user = await Student.findOne({ $or: [{ email }, { username }] });
+  const user = await User.findOne({ $or: [{ email }, { username }] });
   if (user) {
     logger.warn("user already exists with this email or username");
     throw new ApiError(
@@ -31,7 +32,7 @@ export const registerUser = asyncHandler(async (req, res, next) => {
     );
   }
 
-  const newUser = await Student.create({
+  const newUser = await User.create({
     username,
     email,
     password,
@@ -73,37 +74,39 @@ export const loginUser = asyncHandler(async (req, res) => {
 
   const { email, password } = req.body;
 
-  const student = await Student.findOne({ email });
+  const user = await User.findOne({ email });
 
-  if (!student) {
+  if (!user) {
     logger.warn("invalid user");
     throw new ApiError(STATUS_CODES.UNAUTHORIZED, "invalid user");
   }
 
-  const isPasswordCorrect = await student.comparePassword(password);
+  const isPasswordCorrect = argon2.verify(user.password, password);
 
   if (!isPasswordCorrect) {
     logger.warn("incorrect password");
     throw new ApiError(STATUS_CODES.UNAUTHORIZED, "incorrect password");
   }
 
-  const { refreshToken, accessToken } = await genrateTokens(student);
+  const { refreshToken, accessToken } = await genrateTokens(user);
 
   res.cookie("accessToken", accessToken, {
     httpOnly: true,
   });
 
-  const studentObj = student.toObject();
+  const userObj = user.toObject();
 
-  delete studentObj.password;
+  delete userObj.password;
 
   return res.status(STATUS_CODES.OK).json(
     new ApiResponce(STATUS_CODES.OK, "Login successFully", {
-      ...studentObj,
+      ...userObj,
       accessToken,
       refreshToken,
     })
   );
 });
 
-export const logoutUser = async (req, res) => {};
+export const logoutUser = asyncHandler(async(req,res)=>{
+
+})

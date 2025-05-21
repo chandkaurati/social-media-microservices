@@ -17,8 +17,8 @@ const authMiddleware = async (req, res, next) => {
         message: "invalid request",
       });
     }
-
-    console.log(decoded)
+    
+    req.user = decoded
 
     next()
   } catch (error) {

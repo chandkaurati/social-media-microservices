@@ -17,6 +17,16 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    refreshToken: {
+      type: String,
+    },
+    verificationCode: {
+      type: String,
+    },
+    verificationCodeExpiry: {
+      type: Date,
+      default: Date.now() + 24 * 60 * 60 * 1000,
+    },
   },
   { timestamps: true }
 );
@@ -34,14 +44,6 @@ userSchema.pre("save", async function (next) {
   }
 });
 
-userSchema.methods.comparePassword = async function (userpassword) {
-  try {
-    return await argon2.verify(this.password, userpassword);
-  } catch (error) {
-    console.log(error);
-  }
-};
+const User = mongoose.model("User", userSchema);
 
-const Student = mongoose.model("Student", userSchema);
-
-export default Student;
+export default User;
